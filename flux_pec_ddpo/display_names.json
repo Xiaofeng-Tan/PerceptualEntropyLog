@@ -1,0 +1,13 @@
+{
+  "hide": [
+    "flux-ddpo_2026.10.14_16.52.17"
+  ],
+  "rename": {
+    "flux-ddpo-pcvae-a003_2026.10.15_11.11.00": "DDPO-PCVAE-0.03",
+    "flux-pcvae-a01_2026.10.15_16.58.54": "DDPO-PCVAE-0.1",
+    "flux-entropy-reg-a01_2026.10.16_19.52.53": "DDPO-Native Entropy-0.1",
+    "flux-entropy-reg-a005_2026.10.17_12.54.18": "DDPO-Native Entropy-0.05",
+    "flux-pec-a005_2026.10.18_17.20.35": "DDPO-PEC-0.05",
+    "flux-ddpo-pcvae-a008_2026.10.19_13.58.12": "DDPO-PCVAE-0.08"
+  }
+}

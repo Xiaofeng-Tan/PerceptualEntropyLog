@@ -1,0 +1,7 @@
+{
+ "note": "<REDACTED> FlowGRPO Wan2.1-T2V-1.3B",
+ "num_devices": 8,
+ "batch_size": 48,
+ "num_rollouts": 0,
+ "samples_per_prompt": 16
+}

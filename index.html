@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PerceptualEntropyLog</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --bg:#fbfaf8; --card:#ffffff; --line:#e7e4de; --line-soft:#f0eee9;
+    --ink:#1e2124; --ink-2:#454a51; --muted:#7c828b; --accent:#3d5afe;
+    --warn-bg:#fffaf1; --warn-line:#ecd9ae; --warn-ink:#77521a;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.6 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header {
+    position:sticky; top:0; z-index:20; padding:12px 22px;
+    background:rgba(251,250,248,.86); backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:20px;
+  }
+  header h1 { font-size:15px; font-weight:650; letter-spacing:-.01em; margin:0; }
+  header .sub { color:var(--muted); font-size:12px; }
+  .tabs { display:flex; gap:6px; margin-left:auto; }
+  .tab { padding:5px 13px; border:1px solid var(--line); border-radius:7px; cursor:pointer;
+         color:var(--muted); font-size:13px; background:#fff; transition:all .15s ease; }
+  .tab:hover { border-color:#d3cfc7; color:var(--ink-2); }
+  .tab.on { background:var(--ink); border-color:var(--ink); color:#fff; }
+
+  .layout { display:flex; align-items:flex-start; gap:16px; padding:18px 22px 48px; }
+  aside { width:236px; flex:none; }
+  main { flex:1; min-width:0; }
+
+  .card {
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 1px 2px rgba(20,24,30,.04), 0 1px 12px rgba(20,24,30,.02);
+    padding:16px 18px;
+  }
+  .card + .card { margin-top:14px; }
+  aside .card { padding:14px 16px; }
+
+  h2.sec { font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+           color:var(--muted); margin:0 0 10px; font-weight:600; }
+  h3.cardtitle { font-size:14px; font-weight:650; margin:0 0 10px; letter-spacing:-.005em; }
+
+  .run { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:7px;
+         cursor:pointer; font-size:13px; color:var(--ink-2); transition:background .12s ease; }
+  .run:hover { background:#f5f3ef; }
+  .run .dot { width:9px; height:9px; border-radius:50%; flex:none;
+              box-shadow:0 0 0 2px rgba(255,255,255,.9); }
+  .run.off { opacity:.38; }
+  .run small { display:block; color:var(--muted); font-size:11px; }
+
+  .toolbar { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-bottom:14px; }
+  .toolbar label { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+  .toolbar label.hl { background:#f2f4ff; border:1px solid #dfe3ff; color:#2b3a8f;
+                      border-radius:999px; padding:5px 14px; font-weight:600; }
+  .toolbar input[type=range] { accent-color:var(--accent); width:150px; }
+  .toolbar b { min-width:32px; text-align:right; font-weight:650; color:#2b3a8f; }
+  select {
+    font:inherit; color:var(--ink-2); background:#fff;
+    border:1px solid var(--line); border-radius:7px; padding:4px 9px; max-width:270px;
+  }
+  select:focus-visible, input:focus-visible { outline:2px solid #c9d0ff; outline-offset:1px; }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:14px; }
+  .cardhead { display:flex; align-items:center; gap:9px; margin:-2px 0 6px; flex-wrap:wrap; }
+  .cardhead span { color:var(--muted); font-size:12px; }
+  .chart { height:330px; }
+
+  .warn { background:var(--warn-bg); border:1px solid var(--warn-line); color:var(--warn-ink);
+          border-radius:9px; padding:11px 13px; font-size:13px; margin:0 0 14px; }
+  .warn b { font-weight:650; }
+  .note { color:var(--muted); font-size:12px; margin:12px 0 0; }
+  .prompttext { color:var(--muted); font-size:12.5px; margin:0 0 12px; font-style:italic; }
+
+  /* step scrubber */
+  .scrub { display:flex; align-items:center; gap:14px; margin:0 0 14px; flex-wrap:wrap; }
+  .scrub .track { flex:1 1 260px; display:flex; align-items:center; gap:10px; }
+  .scrub input[type=range] { accent-color:var(--accent); flex:1; min-width:160px; }
+  .scrub .val { font-variant-numeric:tabular-nums; font-weight:650; font-size:13px; min-width:74px; }
+  .scrub .hintlite { color:var(--muted); font-size:12px; }
+
+  .valrow { display:flex; align-items:center; gap:14px; padding:7px 0;
+            border-top:1px solid var(--line-soft); }
+  .valrow:first-of-type { border-top:0; }
+  .valrow-h { width:200px; flex:none; display:flex; align-items:center; gap:9px; font-size:13px; font-weight:600; }
+  .valrow-h .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .valrow-h .st { color:var(--muted); font-weight:400; font-size:11.5px; margin-left:auto;
+                  font-variant-numeric:tabular-nums; }
+  .valrow-imgs { display:flex; gap:7px; }
+  .valrow-imgs img { width:152px; height:152px; object-fit:cover; border-radius:8px; background:#f2f0ec;
+                     cursor:zoom-in; transition:transform .16s ease, box-shadow .16s ease; }
+  .valrow-imgs img:hover { transform:scale(1.05); box-shadow:0 8px 20px rgba(20,24,30,.18); }
+  .valrow.ended { opacity:.45; }
+
+  /* consent gate */
+  .gate { position:absolute; inset:0; z-index:6; border-radius:12px;
+          background:rgba(251,250,248,.9); backdrop-filter:blur(3px);
+          display:flex; align-items:center; justify-content:center; padding:24px; }
+  .gatebox { max-width:520px; text-align:center; }
+  .gatebox .icon { font-size:26px; }
+  .gatebox h4 { margin:6px 0 8px; font-size:15px; font-weight:650; }
+  .gatebox p { margin:0 0 16px; color:var(--ink-2); font-size:13px; }
+  .btn { font:inherit; font-weight:600; color:#fff; background:var(--ink);
+         border:1px solid var(--ink); border-radius:8px; padding:8px 18px; cursor:pointer;
+         transition:opacity .15s ease; }
+  .btn:hover { opacity:.88; }
+  .gatebox label { display:block; margin-top:12px; color:var(--muted); font-size:12px; }
+
+  .lightbox { position:fixed; inset:0; background:rgba(18,20,24,.88); display:none;
+              align-items:center; justify-content:center; z-index:99; padding:24px; }
+  .lightbox.on { display:flex; }
+  .lightbox img { max-width:92vw; max-height:88vh; border-radius:10px;
+                  box-shadow:0 18px 60px rgba(0,0,0,.55); }
+
+  .foot { color:var(--muted); font-size:12px; padding:0 22px 40px; }
+  .foot a { color:var(--muted); }
+  code { background:#f4f2ee; padding:1px 5px; border-radius:4px; font-size:12px; }
+
+  @media (max-width:760px) {
+    body { font-size:13px; }
+    header { padding:10px 14px; gap:10px; flex-direction:column; align-items:flex-start; }
+    .tabs { margin-left:0; width:100%; overflow-x:auto; }
+    .tab { flex:none; }
+    .layout { flex-direction:column; padding:12px 14px 32px; gap:12px; }
+    aside { width:100%; }
+    #runs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; }
+    .run small { display:none; }
+    .cards { grid-template-columns:1fr; }
+    .card { padding:13px 14px; }
+    .chart { height:270px; }
+    .valrow { gap:10px; }
+    .valrow-h { width:120px; font-size:11.5px; }
+    .valrow-h .st { display:none; }
+    .valrow-imgs { gap:5px; }
+    .valrow-imgs img { width:82px; height:82px; }
+    .foot { padding:0 14px 32px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>PerceptualEntropyLog</h1>
+  <span class="sub">sanitized training logs · Perc-EC / Perc-VC</span>
+  <div class="tabs" id="tabs"></div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="card">
+      <h2 class="sec">Experiments</h2>
+      <div id="runs"></div>
+    </div>
+  </aside>
+  <main>
+    <div class="card">
+      <div class="toolbar">
+        <label class="hl">smoothing <input type="range" id="smooth" min="0" max="0.99" step="0.01" value="0.4">
+          <b id="smoothVal">0.40</b></label>
+        <label>x-axis
+          <select id="xaxis">
+            <option value="step">step</option>
+            <option value="time">time (h)</option>
+          </select>
+        </label>
+        <label id="alignWrap"></label>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3 class="cardtitle">Reward</h3>
+        <div class="cardhead"><select id="selReward"></select><span id="rewardNote"></span></div>
+        <div class="chart" id="chartReward"></div>
+      </div>
+      <div class="card">
+        <h3 class="cardtitle">Diversity</h3>
+        <div class="cardhead"><select id="selDiv"></select><span id="divNote"></span></div>
+        <div class="chart" id="chartDiv"></div>
+      </div>
+    </div>
+
+    <div class="card" id="samplesCard" style="position:relative">
+      <h3 class="cardtitle">Validation samples over training</h3>
+      <p class="warn">⚠️ <b>Content warning.</b> These are raw model samples from RL post-training.
+        Pretrained visual generative models are usually audited to suppress violent or pornographic
+        outputs, but visual post-training and diversity-promoting optimization can weaken those built-in
+        safeguards and reintroduce harmful visual content.</p>
+
+      <div class="scrub">
+        <div class="track">
+          <span class="hintlite">step</span>
+          <input type="range" id="stepSlider" min="20" max="2120" step="20" value="1000">
+          <span class="val" id="stepVal">1000</span>
+        </div>
+        <span class="hintlite">drag to scrub through training</span>
+      </div>
+
+      <p class="prompttext" id="valPrompt"></p>
+      <div id="valBlocks"></div>
+      <p class="note">One row per run: 3 samples of the same prompt at the selected step, using the step
+        values logged in SwanLab. Rows fade out once a run has ended. Click an image to enlarge.</p>
+
+      <div class="gate" id="gate">
+        <div class="gatebox">
+          <div class="icon">⚠️</div>
+          <h4>Content notice</h4>
+          <p>The samples below are unfiltered model outputs from RL post-training and may contain
+            violent, sexual or otherwise disturbing imagery.</p>
+          <button class="btn" id="gateBtn">I understand — show samples</button>
+          <label><input type="checkbox" id="gateRemember"> remember my choice in this browser</label>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""></div>
+<div class="foot">Sanitized logs read directly from <code>scalars.json</code> ·
+  <a href="https://github.com/Xiaofeng-Tan/PerceptualEntropyLog">repository</a></div>
+
+<script>
+const SETTINGS = [
+  {
+    key: "flux", name: "flux_pec_ddpo", dir: "flux_pec_ddpo",
+    reward: "reward_pickscore", div: "group_emb_var", divScale: 1e5,
+    runs: [
+      { name: "DDPO-PEC-0.05",            label: "Perc-EC (λ=0.05)",     color: "#3d5afe" },
+      { name: "DDPO-PCVAE-0.03",          label: "Perc-VC (λ=0.03)",     color: "#7e57c2" },
+      { name: "DDPO-PCVAE-0.08",          label: "Perc-VC (λ=0.08)",     color: "#2e9e6b" },
+      { name: "DDPO-PCVAE-0.1",           label: "Perc-VC (λ=0.10)",     color: "#00897b" },
+      { name: "DDPO-Native Entropy-0.05", label: "Native Ent. (λ=0.05)", color: "#ef6c00" },
+      { name: "DDPO-Native Entropy-0.1",  label: "Native Ent. (λ=0.10)", color: "#d8433a" }
+    ]
+  },
+  {
+    key: "wan", name: "wan21_pec_final", dir: "wan21_pec_final",
+    reward: "eval/reward", div: "eval/reward_group_emb_var", divScale: 1e5,
+    alignedRun: "Native Entropy-0.05",
+    runs: [
+      { name: "baseline-GRPO",       label: "Flow-GRPO",             color: "#8a9099" },
+      { name: "PEC-0.04",            label: "Perc-EC (λ=0.04)",      color: "#2e9e6b" },
+      { name: "PEC-0.05",            label: "Perc-EC (λ=0.05)",      color: "#3d5afe" },
+      { name: "Native Entropy-0.05", label: "Native Ent. (λ=0.05)",  color: "#ef6c00" }
+    ]
+  }
+];
+
+const cache = new Map();
+let setting = SETTINGS[0];
+const shown = new Map();
+const chartReward = echarts.init(document.getElementById("chartReward"));
+const chartDiv = echarts.init(document.getElementById("chartDiv"));
+let resizeTimer;
+window.addEventListener("resize", () => {
+  chartReward.resize(); chartDiv.resize();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(draw, 150);
+});
+
+async function scalars(run, aligned) {
+  const file = aligned ? "scalars_aligned.json" : "scalars.json";
+  const key = `${setting.dir}/${run}/${file}`;
+  if (!cache.has(key)) {
+    const url = `./${setting.dir}/runs/${encodeURIComponent(run)}/${file}`;
+    cache.set(key, await fetch(url).then(r => r.json()));
+  }
+  return cache.get(key);
+}
+
+function smooth(vals, alpha) {
+  if (alpha <= 0) return vals;
+  const out = []; let acc = vals[0];
+  for (const v of vals) { acc = alpha * acc + (1 - alpha) * v; out.push(acc); }
+  return out;
+}
+
+function renderTabs() {
+  const box = document.getElementById("tabs");
+  box.innerHTML = "";
+  SETTINGS.forEach(s => {
+    const b = document.createElement("div");
+    b.className = "tab" + (s === setting ? " on" : "");
+    b.textContent = s.name;
+    b.onclick = () => { setting = s; show(); };
+    box.appendChild(b);
+  });
+}
+
+function renderRuns() {
+  const box = document.getElementById("runs");
+  box.innerHTML = "";
+  setting.runs.forEach(r => {
+    if (!shown.has(r.name)) shown.set(r.name, true);
+    const on = shown.get(r.name);
+    const el = document.createElement("div");
+    el.className = "run" + (on ? "" : " off");
+    el.innerHTML = `<span class="dot" style="background:${r.color}"></span>` +
+                   `<span>${r.label}<small>${r.name}</small></span>`;
+    el.onclick = () => { shown.set(r.name, !shown.get(r.name)); renderRuns(); draw(); };
+    box.appendChild(el);
+  });
+
+  const wrap = document.getElementById("alignWrap");
+  wrap.innerHTML = setting.alignedRun
+    ? `<input type="checkbox" id="alignBox" checked> align ${setting.alignedRun} step axis` : "";
+  const box2 = document.getElementById("alignBox");
+  if (box2) box2.onchange = draw;
+}
+
+async function loadKeys() {
+  const set = new Set();
+  for (const r of setting.runs) {
+    const d = await scalars(r.name, r.name === setting.alignedRun);
+    Object.keys(d).forEach(k => set.add(k));
+  }
+  const keys = [...set].sort();
+  for (const [id, def] of [["selReward", setting.reward], ["selDiv", setting.div]]) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = keys.map(k =>
+      `<option value="${k}"${k === def ? " selected" : ""}>${k}</option>`).join("");
+    if (!keys.includes(def)) sel.value = keys[0];
+    sel.onchange = draw;
+  }
+}
+
+function baseOption(xName) {
+  const small = window.innerWidth < 760;
+  return {
+    animation: false,
+    grid: { left: small ? 46 : 58, right: small ? 12 : 18, top: small ? 30 : 32, bottom: small ? 38 : 42 },
+    tooltip: { trigger: "axis", confine: true, axisPointer: { type: "line" },
+               backgroundColor: "rgba(255,255,255,.96)", borderColor: "#e7e4de",
+               textStyle: { color: "#1e2124", fontSize: small ? 11 : 12 } },
+    legend: { top: 0, type: small ? "scroll" : "plain",
+              itemWidth: small ? 12 : 16, itemHeight: small ? 7 : 8,
+              textStyle: { fontSize: small ? 10 : 11.5, color: "#454a51" } },
+    xAxis: { type: "value", name: xName, nameLocation: "middle", nameGap: small ? 22 : 26,
+             nameTextStyle: { color: "#7c828b", fontSize: small ? 10 : 11.5 },
+             axisLabel: { fontSize: small ? 10 : 11.5, color: "#7c828b" },
+             axisLine: { lineStyle: { color: "#e0dcd5" } },
+             axisTick: { show: false },
+             splitLine: { show: false } },
+    yAxis: { type: "value", scale: true,
+             axisLabel: { fontSize: small ? 10 : 11.5, color: "#7c828b" },
+             axisLine: { show: false }, axisTick: { show: false },
+             splitLine: { lineStyle: { color: "#f2f0eb" } } },
+    series: []
+  };
+}
+
+async function draw() {
+  const alpha = parseFloat(document.getElementById("smooth").value);
+  document.getElementById("smoothVal").textContent = alpha.toFixed(2);
+  const byTime = document.getElementById("xaxis").value === "time";
+  const aligned = document.getElementById("alignBox")
+    ? document.getElementById("alignBox").checked : false;
+
+  const rKey = document.getElementById("selReward").value;
+  const dKey = document.getElementById("selDiv").value;
+  const scaleOf = k => (k === setting.div ? setting.divScale : 1);
+
+  const optR = baseOption(byTime ? "time (h)" : "step");
+  const optD = baseOption(byTime ? "time (h)" : "step");
+
+  for (const r of setting.runs) {
+    if (!shown.get(r.name)) continue;
+    const data = await scalars(r.name, aligned && r.name === setting.alignedRun);
+    for (const [metric, opt, scale] of [[rKey, optR, scaleOf(rKey)], [dKey, optD, scaleOf(dKey)]]) {
+      const pts = data[metric];
+      if (!pts) continue;
+      const y = smooth(pts.map(p => p.value), alpha);
+      const t0 = byTime ? pts[0].timestamp : 0;
+      const xs = byTime ? pts.map(p => (p.timestamp - t0) / 3.6e6) : pts.map(p => p.step);
+      opt.series.push({
+        name: r.label, type: "line", showSymbol: false, sampling: "lttb",
+        lineStyle: { width: 1.7, color: r.color }, itemStyle: { color: r.color },
+        data: xs.map((x, i) => [x, y[i] * scale])
+      });
+    }
+  }
+  chartReward.setOption(optR, true);
+  chartDiv.setOption(optD, true);
+
+  document.getElementById("rewardNote").textContent = scaleOf(rKey) !== 1 ? "×10⁻⁵" : "";
+  document.getElementById("divNote").textContent = scaleOf(dKey) !== 1 ? "×10⁻⁵" : "";
+}
+
+/* ---- validation samples ---- */
+const VAL_STEPS = {
+  prompt: "Beautiful woman in skin tight body suite working o...",
+  runs: [
+    { id: "r1", label: "Perc-EC (λ=0.05)", name: "DDPO-PEC-0.05", color: "#3d5afe", steps: [20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580, 620, 660, 700, 740, 780, 820, 860, 900, 940, 980, 1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300] },
+    { id: "r2", label: "Perc-VC (λ=0.03)", name: "DDPO-PCVAE-0.03", color: "#7e57c2", steps: [20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580, 620, 660, 700, 740, 780, 820, 860, 900, 940, 980, 1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1340, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740, 1780, 1820, 1860, 1900, 1940, 1980, 2020, 2060, 2100, 2120] },
+    { id: "r3", label: "Perc-VC (λ=0.08)", name: "DDPO-PCVAE-0.08", color: "#2e9e6b", steps: [20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580, 620, 660, 700, 740, 780, 820, 860, 900, 940, 980, 1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1340, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740, 1780, 1820, 1860, 1900, 1940, 1980, 2020, 2060, 2100, 2120] },
+    { id: "r4", label: "Perc-VC (λ=0.10)", name: "DDPO-PCVAE-0.1", color: "#00897b", steps: [20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580, 620, 660, 700, 740, 780, 820, 860, 900, 940, 980, 1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1340, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740, 1780, 1820, 1860, 1900, 1940, 1980, 2020, 2060, 2100, 2120] },
+    { id: "r5", label: "Native Ent. (λ=0.05)", name: "DDPO-Native Entropy-0.05", color: "#ef6c00", steps: [20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580, 620, 660, 700, 740, 780, 820, 860, 900, 940, 980, 1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1340, 1380, 1420, 1460, 1500, 1540, 1580, 1620] },
+    { id: "r6", label: "Native Ent. (λ=0.10)", name: "DDPO-Native Entropy-0.1", color: "#d8433a", steps: [20, 60, 100, 140, 160] }
+  ]
+};
+const CONSENT_KEY = "pel-samples-consent";
+
+function consented() {
+  try { return localStorage.getItem(CONSENT_KEY) === "1" || sessionStorage.getItem(CONSENT_KEY) === "1"; }
+  catch (e) { return false; }
+}
+
+function nearestStep(steps, target) {
+  return steps.reduce((best, s) =>
+    Math.abs(s - target) < Math.abs(best - target) ? s : best, steps[0]);
+}
+
+function updateStep() {
+  if (!consented()) return;
+  const target = parseInt(document.getElementById("stepSlider").value, 10);
+  document.getElementById("stepVal").textContent = target;
+  VAL_STEPS.runs.forEach(r => {
+    const maxS = r.steps[r.steps.length - 1];
+    const ended = target > maxS;
+    const s = ended ? maxS : nearestStep(r.steps, target);
+    const row = document.getElementById("row-" + r.id);
+    if (row) row.classList.toggle("ended", ended);
+    document.getElementById("st-" + r.id).textContent =
+      ended ? "step " + s + " · ended" : "step " + s;
+    for (let k = 0; k < 3; k++) {
+      document.getElementById(`img-${r.id}-${k}`).src =
+        `./samples/val/${r.id}_s${s}_${k}.jpg`;
+    }
+  });
+}
+
+function initSamples() {
+  document.getElementById("valPrompt").textContent = "prompt: " + VAL_STEPS.prompt;
+  const box = document.getElementById("valBlocks");
+  box.innerHTML = "";
+
+  VAL_STEPS.runs.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "valrow";
+    row.id = "row-" + r.id;
+    const head = document.createElement("div");
+    head.className = "valrow-h";
+    head.innerHTML = `<span class="dot" style="background:${r.color}"></span>` +
+                     `<span>${r.label}</span><span class="st" id="st-${r.id}"></span>`;
+    head.title = r.name;
+    row.appendChild(head);
+
+    const imgs = document.createElement("div");
+    imgs.className = "valrow-imgs";
+    for (let k = 0; k < 3; k++) {
+      const img = document.createElement("img");
+      img.id = `img-${r.id}-${k}`;
+      img.alt = `${r.label} sample ${k + 1}`;
+      img.onclick = () => openLightbox(img.src);
+      imgs.appendChild(img);
+    }
+    row.appendChild(imgs);
+    box.appendChild(row);
+  });
+
+  const slider = document.getElementById("stepSlider");
+  slider.max = Math.max(...VAL_STEPS.runs.map(r => r.steps[r.steps.length - 1]));
+  slider.value = Math.min(1000, Number(slider.max));
+  document.getElementById("stepVal").textContent = slider.value;
+  slider.oninput = updateStep;
+
+  if (consented()) {
+    document.getElementById("gate").style.display = "none";
+    updateStep();
+  } else {
+    document.getElementById("gateBtn").onclick = () => {
+      const store = document.getElementById("gateRemember").checked ? localStorage : sessionStorage;
+      try { store.setItem(CONSENT_KEY, "1"); } catch (e) {}
+      document.getElementById("gate").style.display = "none";
+      updateStep();
+    };
+  }
+}
+
+function openLightbox(src) {
+  document.getElementById("lightboxImg").src = src;
+  document.getElementById("lightbox").classList.add("on");
+}
+function closeLightbox() { document.getElementById("lightbox").classList.remove("on"); }
+document.getElementById("lightbox").onclick = closeLightbox;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
+
+async function show() { renderTabs(); renderRuns(); await loadKeys(); draw(); }
+
+show();
+initSamples();
+
+document.getElementById("smooth").oninput = draw;
+document.getElementById("xaxis").onchange = draw;
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# SwanLab raw logs (binary WAL / shared-memory files)
+**/swanlog/
+
+# Per-run environment dumps (up to 221M each)
+**/system.json
+
+# Only scalars.json (+ *_aligned.json) and config.json are tracked; these are not
+# needed to reproduce the paper figures and are large:
+**/console.log
+**/environment.json
+**/requirements.txt
+**/run.json
+
+# Editor / OS junk
+.DS_Store
+__pycache__/
+*.pyc
