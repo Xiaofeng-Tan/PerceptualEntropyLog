@@ -1,0 +1,21 @@
+{
+ "mode": "samples",
+ "run_samples_per_step": 768.0,
+ "reference_samples_per_step": 1520.0,
+ "rollouts_per_reference_step": 1.9791666666666667,
+ "source_axis": "rollout/step (eval/step for eval/* keys)",
+ "last_rollout_step": 499.0,
+ "resumes": [
+  {
+   "global_step": 2960,
+   "resumed_at_rollout": 481.0
+  }
+ ],
+ "re_evaluations": [
+  {
+   "global_step": 3070,
+   "from_rollout": 10.0
+  }
+ ],
+ "last_equivalent_step": 252
+}
